@@ -71,6 +71,14 @@ export function sectionOfCategory(category: string): Section {
   return "opex";
 }
 
+/** Built-in categories for a section plus any user-added custom ones (deduped). */
+export function mergeCategories(section: Section, custom: string[]): string[] {
+  const base = CATEGORIES_BY_SECTION[section];
+  const seen = new Set(base.map((c) => c.toLowerCase()));
+  const extra = custom.filter((c) => c.trim() && !seen.has(c.trim().toLowerCase()));
+  return [...base, ...extra];
+}
+
 export const MONTH_NAMES = [
   "January",
   "February",

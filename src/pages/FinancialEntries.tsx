@@ -10,12 +10,13 @@ import {
   monthEndLabel,
   MONTH_NAMES,
   SECTION_LABELS,
-  CATEGORIES_BY_SECTION,
   ENTRY_SECTIONS,
   PAYMENT_MODES,
   quarterMonths,
+  mergeCategories,
 } from "@/lib/categories";
 import { useAccountsStore } from "@/store/useAccountsStore";
+import { useCategoriesStore } from "@/store/useCategoriesStore";
 import { EntryGrid } from "@/components/entries/EntryGrid";
 import { EntriesTable } from "@/components/entries/EntriesTable";
 import { StatementReport } from "@/components/statement/StatementReport";
@@ -30,9 +31,10 @@ import type { Entry, Section } from "@/types";
 
 export function FinancialEntries() {
   const { date, year, month, searchQuery } = useAppStore();
-  const { entries, removeEntry, removeMany, editEntry } = useEntriesStore();
+  const { entries, addEntry, removeEntry, removeMany, editEntry } = useEntriesStore();
   const { company } = useCompanyStore();
   const { accounts } = useAccountsStore();
+  const { custom } = useCategoriesStore();
 
   const [showPreview, setShowPreview] = useState(true);
   const [editing, setEditing] = useState<Entry | null>(null);
@@ -41,6 +43,7 @@ export function FinancialEntries() {
   const [deletingAll, setDeletingAll] = useState(false);
 
   // Edit dialog fields
+  const [editSection, setEditSection] = useState<Section>("cos");
   const [editDate, setEditDate] = useState("");
   const [editCategory, setEditCategory] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -51,6 +54,7 @@ export function FinancialEntries() {
 
   const openEdit = (e: Entry) => {
     setEditing(e);
+    setEditSection(e.section === "income" ? "opex" : e.section);
     setEditDate(e.date);
     setEditCategory(e.category);
     setEditDescription(e.description);
@@ -60,6 +64,19 @@ export function FinancialEntries() {
     setEditAccount(e.account ?? "");
     setEditPaymentMode(e.paymentMode ?? "");
     setEditSupplier(e.supplier ?? "");
+  };
+
+  // Categories available for the currently chosen Type in the edit dialog.
+  const editCategories = useMemo(
+    () => mergeCategories(editSection, custom[editSection]),
+    [editSection, custom]
+  );
+
+  // When the Type changes, keep the category valid for the new section.
+  const onEditSectionChange = (value: Section) => {
+    setEditSection(value);
+    const list = mergeCategories(value, custom[value]);
+    if (!list.includes(editCategory)) setEditCategory(list[0] ?? "");
   };
 
   // editTotal is the VAT-inclusive amount; net + VAT are extracted from it.
@@ -72,9 +89,7 @@ export function FinancialEntries() {
     const [y, m] = editDate.split("-").map(Number);
     if (!y || !m || editTotal === null || editTotal < 0) return;
     const expr = editAmount.replace(/\s+/g, "");
-    await editEntry({
-      id: editing.id,
-      section: editing.section,
+    const data = {
       date: editDate,
       year: y,
       month: m,
@@ -86,7 +101,15 @@ export function FinancialEntries() {
       paymentMode: editPaymentMode,
       supplier: editSupplier.trim(),
       breakdown: isMathExpression(expr) ? expr : "",
-    });
+    };
+    if (editSection === editing.section) {
+      await editEntry({ id: editing.id, section: editing.section, ...data });
+    } else {
+      // Type changed (Direct Cost <-> Operating Expenses). Sections live in
+      // separate tables, so move the record: remove the old, create the new.
+      await removeEntry(editing);
+      await addEntry({ section: editSection, ...data });
+    }
     setEditing(null);
   };
 
@@ -127,10 +150,13 @@ export function FinancialEntries() {
   // categories, Operating Expenses only operating ones, All types shows both.
   const categories = useMemo(() => {
     if (filterSection === "all") {
-      return [...CATEGORIES_BY_SECTION.cos, ...CATEGORIES_BY_SECTION.opex];
+      return [
+        ...mergeCategories("cos", custom.cos),
+        ...mergeCategories("opex", custom.opex),
+      ];
     }
-    return [...CATEGORIES_BY_SECTION[filterSection]];
-  }, [filterSection]);
+    return mergeCategories(filterSection, custom[filterSection]);
+  }, [filterSection, custom]);
 
   const onFilterSectionChange = (value: "all" | Section) => {
     setFilterSection(value);
@@ -138,7 +164,7 @@ export function FinancialEntries() {
     if (
       filterCategory !== "all" &&
       value !== "all" &&
-      !CATEGORIES_BY_SECTION[value].includes(filterCategory)
+      !mergeCategories(value, custom[value]).includes(filterCategory)
     ) {
       setFilterCategory("all");
     }
@@ -315,15 +341,34 @@ export function FinancialEntries() {
                 <span className="font-semibold">Net of VAT: {formatMoney(editNet, 2)}</span>
               </div>
             )}
-            <div className="space-y-1.5">
-              <Label>Category</Label>
-              <Select value={editCategory} onChange={(e) => setEditCategory(e.target.value)}>
-                {CATEGORIES_BY_SECTION[editing.section].map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Type</Label>
+                <Select
+                  value={editSection}
+                  onChange={(e) => onEditSectionChange(e.target.value as Section)}
+                >
+                  {ENTRY_SECTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {SECTION_LABELS[s]}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Select value={editCategory} onChange={(e) => setEditCategory(e.target.value)}>
+                  {editCategories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                  {/* Preserve a legacy/custom value even if it's no longer listed */}
+                  {editCategory && !editCategories.includes(editCategory) && (
+                    <option value={editCategory}>{editCategory}</option>
+                  )}
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

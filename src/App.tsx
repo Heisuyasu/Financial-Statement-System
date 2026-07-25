@@ -11,19 +11,25 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { useAppStore } from "@/store/useAppStore";
 import { useEntriesStore } from "@/store/useEntriesStore";
 import { useCompanyStore } from "@/store/useCompanyStore";
+import { useCategoriesStore } from "@/store/useCategoriesStore";
+import { useAccountsStore } from "@/store/useAccountsStore";
 import { useReportActions } from "@/hooks/useReportActions";
 
 export default function App() {
   const { page, year, month, setPage, loadPersisted } = useAppStore();
   const { loadYear, undo, redo } = useEntriesStore();
   const { load: loadCompany } = useCompanyStore();
+  const { load: loadCategories } = useCategoriesStore();
+  const { load: loadAccounts } = useAccountsStore();
   const { exportPdf, exportXlsx } = useReportActions();
 
   // Initial load
   useEffect(() => {
     loadPersisted();
     loadCompany();
-  }, [loadPersisted, loadCompany]);
+    loadCategories();
+    loadAccounts();
+  }, [loadPersisted, loadCompany, loadCategories, loadAccounts]);
 
   // Reload all data when the year changes
   useEffect(() => {

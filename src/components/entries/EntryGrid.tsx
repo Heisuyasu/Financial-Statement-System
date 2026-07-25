@@ -9,12 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useAppStore } from "@/store/useAppStore";
 import { useEntriesStore } from "@/store/useEntriesStore";
 import { useAccountsStore } from "@/store/useAccountsStore";
+import { useCategoriesStore } from "@/store/useCategoriesStore";
 import {
-  CATEGORIES_BY_SECTION,
   SECTION_LABELS,
   ENTRY_SECTIONS,
   PAYMENT_MODES,
   MONTH_NAMES,
+  mergeCategories,
 } from "@/lib/categories";
 import {
   evalAmountExpression,
@@ -29,9 +30,10 @@ export function EntryGrid() {
   const { date, setDate, setPage, notify } = useAppStore();
   const { addEntry } = useEntriesStore();
   const { accounts, load: loadAccounts } = useAccountsStore();
+  const { custom, load: loadCategories } = useCategoriesStore();
 
   const [section, setSection] = useState<Section>("cos");
-  const [category, setCategory] = useState<string>(CATEGORIES_BY_SECTION["cos"][0] ?? "");
+  const [category, setCategory] = useState<string>("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [account, setAccount] = useState("");
@@ -41,15 +43,19 @@ export function EntryGrid() {
 
   useEffect(() => {
     loadAccounts();
-  }, [loadAccounts]);
+    loadCategories();
+  }, [loadAccounts, loadCategories]);
 
-  const categories = CATEGORIES_BY_SECTION[section];
+  const categories = useMemo(
+    () => mergeCategories(section, custom[section]),
+    [section, custom]
+  );
 
-  // Keep the category valid whenever the section changes.
+  // Keep the category valid whenever the section (or category list) changes.
   useEffect(() => {
     if (!categories.includes(category)) setCategory(categories[0] ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section]);
+  }, [categories]);
 
   // year/month derived from the picked date
   const { year, month } = useMemo(() => {

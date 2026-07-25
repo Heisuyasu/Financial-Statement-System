@@ -17,11 +17,23 @@ function sumByCategory(
     const gross = e.amount + (e.vat ?? 0);
     map.set(e.category, (map.get(e.category) ?? 0) + gross);
   }
-  return categories.map((category) => ({
+
+  // Built-in categories first, in their canonical order...
+  const lines = categories.map((category) => ({
     category,
     amount: Math.round((map.get(category) ?? 0) * 100) / 100,
     percent: 0,
   }));
+
+  // ...then any custom categories that actually appear in the entries, so
+  // user-added categories still show up on the statement and exports.
+  const known = new Set(categories);
+  for (const [category, amount] of map) {
+    if (!known.has(category)) {
+      lines.push({ category, amount: Math.round(amount * 100) / 100, percent: 0 });
+    }
+  }
+  return lines;
 }
 
 /**

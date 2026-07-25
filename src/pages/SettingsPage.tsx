@@ -6,6 +6,7 @@ import {
   Trash2,
   Plus,
   Wallet,
+  Tags,
   DatabaseBackup,
   Download,
   RotateCcw,
@@ -13,6 +14,7 @@ import {
 import { useCompanyStore } from "@/store/useCompanyStore";
 import { useAppStore } from "@/store/useAppStore";
 import { useAccountsStore } from "@/store/useAccountsStore";
+import { useCategoriesStore } from "@/store/useCategoriesStore";
 import { api, isElectron } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Dialog, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { MONTH_NAMES } from "@/lib/categories";
+import { MONTH_NAMES, SECTION_LABELS, ENTRY_SECTIONS } from "@/lib/categories";
+import type { Section } from "@/types";
 
 interface SettingsForm {
   name: string;
@@ -39,8 +42,16 @@ export function SettingsPage() {
   const { theme, toggleTheme, notify } = useAppStore();
   const { accounts, load: loadAccounts, add: addAccount, remove: removeAccount } =
     useAccountsStore();
+  const {
+    custom: customCategories,
+    load: loadCategories,
+    add: addCategory,
+    remove: removeCategory,
+  } = useCategoriesStore();
   const [logo, setLogo] = useState<string>(company?.logo ?? "");
   const [newAccount, setNewAccount] = useState("");
+  const [newCatSection, setNewCatSection] = useState<Section>("cos");
+  const [newCatName, setNewCatName] = useState("");
   const [backingUp, setBackingUp] = useState(false);
   // "pick" = choose a file in a dialog; otherwise a specific auto-backup
   const [restoreTarget, setRestoreTarget] = useState<
@@ -99,7 +110,8 @@ export function SettingsPage() {
 
   useEffect(() => {
     loadAccounts();
-  }, [loadAccounts]);
+    loadCategories();
+  }, [loadAccounts, loadCategories]);
 
   const submitAccount = async () => {
     const name = newAccount.trim();
@@ -107,6 +119,14 @@ export function SettingsPage() {
     await addAccount(name);
     setNewAccount("");
     notify(`Customer "${name}" added`);
+  };
+
+  const submitCategory = async () => {
+    const name = newCatName.trim();
+    if (!name) return;
+    await addCategory(newCatSection, name);
+    setNewCatName("");
+    notify(`Category "${name}" added to ${SECTION_LABELS[newCatSection]}`);
   };
 
   const { register, handleSubmit, reset } = useForm<SettingsForm>({
@@ -345,6 +365,92 @@ export function SettingsPage() {
               ))}
             </ul>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Categories */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Tags className="h-4 w-4" />
+            Categories
+          </CardTitle>
+          <CardDescription>
+            Add your own expense categories under Direct Cost or Operating Expenses. They
+            appear in the entry form and on the statement alongside the built-in ones.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-end gap-2">
+            <div className="w-48 space-y-1.5">
+              <Label htmlFor="s-cat-section">Type</Label>
+              <Select
+                id="s-cat-section"
+                value={newCatSection}
+                onChange={(e) => setNewCatSection(e.target.value as Section)}
+              >
+                {ENTRY_SECTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {SECTION_LABELS[s]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <Label htmlFor="s-cat-name">New category name</Label>
+              <Input
+                id="s-cat-name"
+                value={newCatName}
+                placeholder="e.g. Toll Fees, Warehouse Rental"
+                onChange={(e) => setNewCatName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submitCategory();
+                  }
+                }}
+              />
+            </div>
+            <Button type="button" onClick={submitCategory} disabled={!newCatName.trim()}>
+              <Plus />
+              Add
+            </Button>
+          </div>
+
+          {ENTRY_SECTIONS.map((s) => (
+            <div key={s} className="space-y-1.5">
+              <div className="text-sm font-medium">{SECTION_LABELS[s]}</div>
+              {customCategories[s].length === 0 ? (
+                <p className="rounded-md border border-dashed px-3 py-3 text-center text-xs text-muted-foreground">
+                  No custom categories here yet — only the built-in ones are used.
+                </p>
+              ) : (
+                <ul className="divide-y rounded-md border">
+                  {customCategories[s].map((cat) => (
+                    <li
+                      key={cat}
+                      className="flex items-center justify-between px-3 py-2 text-sm"
+                    >
+                      <span>{cat}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={async () => {
+                          await removeCategory(s, cat);
+                          notify(`Category "${cat}" removed`);
+                        }}
+                        title="Remove category"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
         </CardContent>
       </Card>
 

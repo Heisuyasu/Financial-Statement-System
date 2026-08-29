@@ -221,6 +221,9 @@ function registerIpc(): void {
   });
 }
 
+// Disable GPU shader disk cache to prevent Windows cache lock errors (Access is denied / cache_util_win.cc)
+app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
+
 app.whenReady().then(() => {
   initDatabase();
   registerIpc();

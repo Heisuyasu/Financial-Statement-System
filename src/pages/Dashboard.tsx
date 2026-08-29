@@ -18,7 +18,7 @@ import { useEntriesStore, selectMonthEntries } from "@/store/useEntriesStore";
 import { useCompanyStore } from "@/store/useCompanyStore";
 import { buildStatement, buildMonthlyTotals } from "@/lib/calculations";
 import { MONTH_NAMES, SECTION_LABELS } from "@/lib/categories";
-import { formatMoney, formatDate } from "@/lib/format";
+import { formatMoney, formatDate, formatPercent } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -117,6 +117,23 @@ export function Dashboard() {
   const grossProfit = revenue - statement.totalCos;
   const netIncome = grossProfit - statement.totalOpex;
 
+  const cosPercent =
+    revenue > 0
+      ? (statement.totalCos / revenue) * 100
+      : statement.totalExpenses > 0
+        ? (statement.totalCos / statement.totalExpenses) * 100
+        : 0;
+
+  const opexPercent =
+    revenue > 0
+      ? (statement.totalOpex / revenue) * 100
+      : statement.totalExpenses > 0
+        ? (statement.totalOpex / statement.totalExpenses) * 100
+        : 0;
+
+  const grossProfitPercent = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+  const netIncomePercent = revenue > 0 ? (netIncome / revenue) * 100 : 0;
+
   const saveRevenue = () => {
     api.settings.set(revenueKey, revenueText.trim());
     setEditingRevenue(false);
@@ -207,12 +224,17 @@ export function Dashboard() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#021A54]/10 text-[#021A54] dark:bg-[#FFCEE3]/10 dark:text-[#FFCEE3]">
               <Truck className="h-6 w-6" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium text-muted-foreground">
                 Direct Cost — {periodLabel}
               </div>
-              <div className="truncate text-2xl font-bold tabular-nums">
-                {formatMoney(statement.totalCos, d, true, currency)}
+              <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+                <span className="text-2xl font-bold tabular-nums">
+                  {formatMoney(statement.totalCos, d, true, currency)}
+                </span>
+                <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+                  ({formatPercent(cosPercent)})
+                </span>
               </div>
             </div>
           </CardContent>
@@ -223,12 +245,17 @@ export function Dashboard() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#FFCEE3] text-[#A81F63]">
               <Building className="h-6 w-6" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium text-muted-foreground">
                 Operating Expenses — {periodLabel}
               </div>
-              <div className="truncate text-2xl font-bold tabular-nums">
-                {formatMoney(statement.totalOpex, d, true, currency)}
+              <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+                <span className="text-2xl font-bold tabular-nums">
+                  {formatMoney(statement.totalOpex, d, true, currency)}
+                </span>
+                <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+                  ({formatPercent(opexPercent)})
+                </span>
               </div>
             </div>
           </CardContent>
@@ -240,16 +267,21 @@ export function Dashboard() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#FF85BB]/20 text-[#E44E93]">
               <TrendingUp className="h-6 w-6" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium text-muted-foreground">
                 Gross Profit
               </div>
-              <div
-                className={`truncate text-2xl font-bold tabular-nums ${
-                  grossProfit < 0 ? "text-destructive" : ""
-                }`}
-              >
-                {formatMoney(grossProfit, d, true, currency)}
+              <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+                <span
+                  className={`text-2xl font-bold tabular-nums ${
+                    grossProfit < 0 ? "text-destructive" : ""
+                  }`}
+                >
+                  {formatMoney(grossProfit, d, true, currency)}
+                </span>
+                <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+                  ({formatPercent(grossProfitPercent)})
+                </span>
               </div>
             </div>
           </CardContent>
@@ -261,16 +293,21 @@ export function Dashboard() {
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
               <PiggyBank className="h-6 w-6" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-medium text-muted-foreground">
                 Net Income
               </div>
-              <div
-                className={`truncate text-2xl font-bold tabular-nums ${
-                  netIncome < 0 ? "text-destructive" : ""
-                }`}
-              >
-                {formatMoney(netIncome, d, true, currency)}
+              <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
+                <span
+                  className={`text-2xl font-bold tabular-nums ${
+                    netIncome < 0 ? "text-destructive" : ""
+                  }`}
+                >
+                  {formatMoney(netIncome, d, true, currency)}
+                </span>
+                <span className="text-xs font-semibold text-muted-foreground tabular-nums">
+                  ({formatPercent(netIncomePercent)})
+                </span>
               </div>
             </div>
           </CardContent>

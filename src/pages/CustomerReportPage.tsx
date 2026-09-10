@@ -35,6 +35,7 @@ export function CustomerReportPage() {
     (Math.ceil(month / 3) as 1 | 2 | 3 | 4) || 1
   );
   const [customer, setCustomer] = useState<string>("all");
+  const [category, setCategory] = useState<string>("all");
   const [busy, setBusy] = useState(false);
 
   const d = company?.decimalPlaces ?? 2;
@@ -52,7 +53,7 @@ export function CustomerReportPage() {
     [kind, date, year, month, quarter]
   );
 
-  // Entries within the chosen period (before the customer filter).
+  // Entries within the chosen period (before the customer & category filter).
   const scoped = useMemo(() => scopeEntries(entries, scope), [entries, scope]);
 
   // Customer dropdown options come from whoever appears in this period.
@@ -70,19 +71,40 @@ export function CustomerReportPage() {
   const activeCustomer =
     customer !== "all" && !customerOptions.includes(customer) ? "all" : customer;
 
-  const report = useMemo(() => {
-    const list =
+  // Category dropdown options come from whoever appears in this period (and customer if chosen).
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    const source =
       activeCustomer === "all"
         ? scoped
         : scoped.filter((e) => customerOf(e) === activeCustomer);
-    return buildCustomerReport(list);
+    for (const e of source) {
+      if (e.category?.trim()) set.add(e.category.trim());
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [scoped, activeCustomer]);
 
-  const periodLabel =
-    scopePeriodLabel(scope) +
-    (activeCustomer !== "all" ? ` — ${activeCustomer}` : "");
-  const title =
-    scopeTitle(scope) + (activeCustomer !== "all" ? ` — ${activeCustomer}` : "");
+  // If the selected category isn't in this period/customer, fall back to "all".
+  const activeCategory =
+    category !== "all" && !categoryOptions.includes(category) ? "all" : category;
+
+  const report = useMemo(() => {
+    let list =
+      activeCustomer === "all"
+        ? scoped
+        : scoped.filter((e) => customerOf(e) === activeCustomer);
+    if (activeCategory !== "all") {
+      list = list.filter((e) => (e.category ?? "").trim() === activeCategory);
+    }
+    return buildCustomerReport(list);
+  }, [scoped, activeCustomer, activeCategory]);
+
+  const filterSuffix =
+    (activeCustomer !== "all" ? ` — ${activeCustomer}` : "") +
+    (activeCategory !== "all" ? ` — ${activeCategory}` : "");
+
+  const periodLabel = scopePeriodLabel(scope) + filterSuffix;
+  const title = scopeTitle(scope) + filterSuffix;
   const baseName = `CustomerExpenses_${title.replace(/[^\w]+/g, "_")}`;
   const maxTotal = report.groups.reduce((m, g) => Math.max(m, g.total), 0);
 
@@ -179,6 +201,21 @@ export function CustomerReportPage() {
               ))}
             </Select>
           </div>
+          <div className="space-y-1">
+            <Label>Category</Label>
+            <Select
+              className="w-48"
+              value={activeCategory}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="all">All categories</option>
+              {categoryOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+          </div>
           <Button variant="outline" disabled={busy || report.groups.length === 0} onClick={runPdf}>
             <FileDown />
             PDF
@@ -193,9 +230,13 @@ export function CustomerReportPage() {
       {report.groups.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center text-sm text-muted-foreground">
-            {activeCustomer === "all"
+            {activeCustomer === "all" && activeCategory === "all"
               ? "No entries for this period yet."
-              : `No entries for ${activeCustomer} in this period.`}
+              : activeCustomer !== "all" && activeCategory !== "all"
+                ? `No "${activeCategory}" entries for ${activeCustomer} in this period.`
+                : activeCustomer !== "all"
+                  ? `No entries for ${activeCustomer} in this period.`
+                  : `No "${activeCategory}" entries in this period.`}
           </CardContent>
         </Card>
       ) : (

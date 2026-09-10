@@ -116,7 +116,23 @@ export function FinancialEntries() {
   // Filters
   const [filterSection, setFilterSection] = useState<"all" | Section>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [filterCustomer, setFilterCustomer] = useState<string>("all");
   const [monthScope, setMonthScope] = useState<"day" | "month" | "year">("day");
+
+  // Customer options aggregate accounts and any existing entry accounts
+  const customerOptions = useMemo(() => {
+    const set = new Set<string>(accounts.filter(Boolean));
+    for (const e of entries) {
+      const acc = (e.account ?? "").trim();
+      if (acc) set.add(acc);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [accounts, entries]);
+
+  const hasUnassignedCustomer = useMemo(
+    () => entries.some((e) => !(e.account ?? "").trim()),
+    [entries]
+  );
 
   const scoped = useMemo(() => {
     // A search looks across the whole loaded year so results aren't hidden by the day scope
@@ -130,6 +146,11 @@ export function FinancialEntries() {
             : entries;
     if (filterSection !== "all") list = list.filter((e) => e.section === filterSection);
     if (filterCategory !== "all") list = list.filter((e) => e.category === filterCategory);
+    if (filterCustomer === "__none__") {
+      list = list.filter((e) => !(e.account ?? "").trim());
+    } else if (filterCustomer !== "all") {
+      list = list.filter((e) => (e.account ?? "").trim() === filterCustomer);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter(
@@ -144,7 +165,7 @@ export function FinancialEntries() {
       );
     }
     return list;
-  }, [entries, date, month, monthScope, filterSection, filterCategory, searchQuery]);
+  }, [entries, date, month, monthScope, filterSection, filterCategory, filterCustomer, searchQuery]);
 
   // Category options follow the Type filter: Direct Cost shows only direct-cost
   // categories, Operating Expenses only operating ones, All types shows both.
@@ -240,7 +261,7 @@ export function FinancialEntries() {
               </Button>
             </div>
             {/* Filters */}
-            <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Select
                 value={monthScope}
                 onChange={(e) => setMonthScope(e.target.value as "day" | "month" | "year")}
@@ -269,6 +290,21 @@ export function FinancialEntries() {
               >
                 <option value="all">All categories</option>
                 {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={filterCustomer}
+                onChange={(e) => setFilterCustomer(e.target.value)}
+                aria-label="Customer"
+              >
+                <option value="all">All customers</option>
+                {hasUnassignedCustomer && (
+                  <option value="__none__">(No customer)</option>
+                )}
+                {customerOptions.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -435,7 +471,7 @@ export function FinancialEntries() {
         <DialogDescription>
           This deletes the {scoped.length} entr{scoped.length === 1 ? "y" : "ies"} currently
           shown in the list ({previewTitle}
-          {filterSection !== "all" || filterCategory !== "all"
+          {filterSection !== "all" || filterCategory !== "all" || filterCustomer !== "all"
             ? ", with your filters applied"
             : ""}
           ). You can undo this with Ctrl+Z.
